@@ -37,13 +37,13 @@ export class DateUtils {
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
   }
 
-  static isLeaseExpired(endDate: Date | string): boolean {
+  static isDateExpired(endDate: Date | string): boolean {
     const end = new Date(endDate);
     const now = new Date();
     return end < now;
   }
 
-  static getLeaseDaysRemaining(endDate: Date | string): number {
+  static getDaysRemaining(endDate: Date | string): number {
     const end = new Date(endDate);
     const now = new Date();
     const diffTime = end.getTime() - now.getTime();

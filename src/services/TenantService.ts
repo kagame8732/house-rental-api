@@ -29,7 +29,7 @@ export class TenantService {
         };
       }
 
-      // Check if property is available (no active lease)
+      // Check if property is available (no active tenant)
       const isAvailable = await this.propertyRepository.checkAvailability(
         data.propertyId
       );

@@ -1,15 +1,13 @@
-import { PropertyRepository, LeaseRepository } from "../repositories";
+import { PropertyRepository } from "../repositories";
 import { Property, PropertyStatus } from "../database/models";
 import { CreatePropertyDto, UpdatePropertyDto, PropertyQueryDto } from "../dto";
 import { ApiResponse } from "../types";
 
 export class PropertyService {
   private propertyRepository: PropertyRepository;
-  private leaseRepository: LeaseRepository;
 
   constructor() {
     this.propertyRepository = new PropertyRepository();
-    this.leaseRepository = new LeaseRepository();
   }
 
   async createProperty(
@@ -109,12 +107,17 @@ export class PropertyService {
         };
       }
 
-      const updatedProperty = await this.propertyRepository.update(id, data);
+      await this.propertyRepository.update(id, data);
+
+      // Fetch the updated property
+      const updatedProperty = await this.propertyRepository.findOne({
+        where: { id },
+      });
 
       if (!updatedProperty) {
         return {
           success: false,
-          message: "Failed to update property",
+          message: "Failed to retrieve updated property",
         };
       }
 
@@ -145,18 +148,6 @@ export class PropertyService {
         return {
           success: false,
           message: "Property not found",
-        };
-      }
-
-      // Check if property has active leases
-      const activeLeases = await this.leaseRepository.find({
-        where: { propertyId: id, status: "active" },
-      });
-
-      if (activeLeases.length > 0) {
-        return {
-          success: false,
-          message: "Cannot delete property with active leases",
         };
       }
 

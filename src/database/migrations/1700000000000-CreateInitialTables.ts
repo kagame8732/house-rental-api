@@ -85,6 +85,13 @@ export class CreateInitialTables1700000000000 implements MigrationInterface {
             default: "'active'",
           },
           {
+            name: "monthlyRent",
+            type: "decimal",
+            precision: 10,
+            scale: 2,
+            isNullable: true,
+          },
+          {
             name: "ownerId",
             type: "uuid",
           },
@@ -144,69 +151,15 @@ export class CreateInitialTables1700000000000 implements MigrationInterface {
             default: "'active'",
           },
           {
-            name: "propertyId",
-            type: "uuid",
-          },
-          {
-            name: "createdAt",
-            type: "timestamp",
-            default: "CURRENT_TIMESTAMP",
-          },
-          {
-            name: "updatedAt",
-            type: "timestamp",
-            default: "CURRENT_TIMESTAMP",
-            onUpdate: "CURRENT_TIMESTAMP",
-          },
-        ],
-      }),
-      true
-    );
-
-    // Create leases table
-    await queryRunner.createTable(
-      new Table({
-        name: "leases",
-        columns: [
-          {
-            name: "id",
-            type: "uuid",
-            isPrimary: true,
-            generationStrategy: "uuid",
-            default: "uuid_generate_v4()",
-          },
-          {
-            name: "propertyId",
-            type: "uuid",
-          },
-          {
-            name: "tenantId",
-            type: "uuid",
-          },
-          {
-            name: "startDate",
-            type: "date",
-          },
-          {
-            name: "endDate",
-            type: "date",
-          },
-          {
-            name: "monthlyRent",
+            name: "payment",
             type: "decimal",
             precision: 10,
             scale: 2,
-          },
-          {
-            name: "status",
-            type: "enum",
-            enum: ["active", "expired", "terminated"],
-            default: "'active'",
-          },
-          {
-            name: "notes",
-            type: "text",
             isNullable: true,
+          },
+          {
+            name: "propertyId",
+            type: "uuid",
           },
           {
             name: "createdAt",
@@ -313,18 +266,6 @@ export class CreateInitialTables1700000000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "leases" 
-      ADD CONSTRAINT "FK_leases_property" 
-      FOREIGN KEY ("propertyId") REFERENCES "properties"("id") ON DELETE CASCADE
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE "leases" 
-      ADD CONSTRAINT "FK_leases_tenant" 
-      FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE
-    `);
-
-    await queryRunner.query(`
       ALTER TABLE "maintenance" 
       ADD CONSTRAINT "FK_maintenance_property" 
       FOREIGN KEY ("propertyId") REFERENCES "properties"("id") ON DELETE CASCADE
@@ -338,19 +279,12 @@ export class CreateInitialTables1700000000000 implements MigrationInterface {
       'CREATE INDEX "IDX_tenants_property" ON "tenants" ("propertyId")'
     );
     await queryRunner.query(
-      'CREATE INDEX "IDX_leases_property" ON "leases" ("propertyId")'
-    );
-    await queryRunner.query(
-      'CREATE INDEX "IDX_leases_tenant" ON "leases" ("tenantId")'
-    );
-    await queryRunner.query(
       'CREATE INDEX "IDX_maintenance_property" ON "maintenance" ("propertyId")'
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropTable("maintenance");
-    await queryRunner.dropTable("leases");
     await queryRunner.dropTable("tenants");
     await queryRunner.dropTable("properties");
     await queryRunner.dropTable("users");
