@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../database";
-import { Tenant, TenantStatus, Property, Lease } from "../database/models";
+import { Tenant, TenantStatus, Property } from "../database/models";
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
 
 export class TenantController {
@@ -26,15 +26,14 @@ export class TenantController {
       }
 
       // Check if property is available (not already rented)
-      const leaseRepository = AppDataSource.getRepository(Lease);
-      const activeLease = await leaseRepository.findOne({
+      const existingTenant = await this.tenantRepository.findOne({
         where: {
           propertyId,
           status: "active",
         },
       });
 
-      if (activeLease) {
+      if (existingTenant) {
         res.status(400).json({
           success: false,
           message:
@@ -162,13 +161,7 @@ export class TenantController {
 
       const tenant = await this.tenantRepository.findOne({
         where: { id },
-        relations: ["property", "leases"],
-        join: {
-          alias: "tenant",
-          leftJoinAndSelect: {
-            property: "tenant.property",
-          },
-        },
+        relations: ["property"],
       });
 
       if (!tenant || tenant.property.ownerId !== ownerId) {
@@ -231,15 +224,14 @@ export class TenantController {
         }
 
         // Check if new property is available (not already rented)
-        const leaseRepository = AppDataSource.getRepository(Lease);
-        const activeLease = await leaseRepository.findOne({
+        const existingTenant = await this.tenantRepository.findOne({
           where: {
             propertyId: updateData.propertyId,
             status: "active",
           },
         });
 
-        if (activeLease) {
+        if (existingTenant) {
           res.status(400).json({
             success: false,
             message:

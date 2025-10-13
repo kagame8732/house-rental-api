@@ -21,6 +21,10 @@ export class CreatePropertyDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsNumber()
+  monthlyRent?: number;
 }
 
 export class UpdatePropertyDto {
@@ -39,6 +43,10 @@ export class UpdatePropertyDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsNumber()
+  monthlyRent?: number;
 }
 
 export class PropertyQueryDto {
@@ -91,6 +99,10 @@ export class CreateTenantDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsNumber()
+  payment?: number;
 }
 
 export class UpdateTenantDto {
@@ -113,6 +125,10 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsNumber()
+  payment?: number;
 }
 
 export class TenantQueryDto {
@@ -146,95 +162,6 @@ export class TenantQueryDto {
   @IsOptional()
   @IsString()
   propertyId?: string;
-}
-
-// DTOs for Lease
-export class CreateLeaseDto {
-  @IsString()
-  propertyId!: string;
-
-  @IsString()
-  tenantId!: string;
-
-  @IsString()
-  startDate!: string;
-
-  @IsString()
-  endDate!: string;
-
-  @IsNumber()
-  monthlyRent!: number;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-}
-
-export class UpdateLeaseDto {
-  @IsOptional()
-  @IsString()
-  propertyId?: string;
-
-  @IsOptional()
-  @IsString()
-  tenantId?: string;
-
-  @IsOptional()
-  @IsString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsString()
-  endDate?: string;
-
-  @IsOptional()
-  @IsNumber()
-  monthlyRent?: number;
-
-  @IsOptional()
-  @IsString()
-  status?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-}
-
-export class LeaseQueryDto {
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @IsOptional()
-  @IsString()
-  sortBy?: string;
-
-  @IsOptional()
-  @IsString()
-  sortOrder?: "ASC" | "DESC";
-
-  @IsOptional()
-  @IsString()
-  search?: string;
-
-  @IsOptional()
-  @IsString()
-  status?: string;
-
-  @IsOptional()
-  @IsString()
-  propertyId?: string;
-
-  @IsOptional()
-  @IsString()
-  tenantId?: string;
 }
 
 // DTOs for Maintenance

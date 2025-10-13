@@ -11,10 +11,6 @@ export const API_ENDPOINTS = {
     BASE: "/api/tenants",
     BY_ID: (id: string) => `/api/tenants/${id}`,
   },
-  LEASES: {
-    BASE: "/api/leases",
-    BY_ID: (id: string) => `/api/leases/${id}`,
-  },
   MAINTENANCE: {
     BASE: "/api/maintenance",
     BY_ID: (id: string) => `/api/maintenance/${id}`,

@@ -10,7 +10,6 @@ import {
 } from "typeorm";
 import { User } from "./User";
 import { Tenant } from "./Tenant";
-import { Lease } from "./Lease";
 
 export enum PropertyType {
   HOUSE = "house",
@@ -46,6 +45,9 @@ export class Property {
   })
   status: PropertyStatus;
 
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  monthlyRent: number;
+
   @Column({ type: "uuid" })
   ownerId: string;
 
@@ -55,9 +57,6 @@ export class Property {
 
   @OneToMany(() => Tenant, (tenant) => tenant.property)
   tenants: Tenant[];
-
-  @OneToMany(() => Lease, (lease) => lease.property)
-  leases: Lease[];
 
   @CreateDateColumn()
   createdAt: Date;

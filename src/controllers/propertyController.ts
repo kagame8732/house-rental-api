@@ -1,11 +1,6 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../database";
-import {
-  Property,
-  PropertyType,
-  PropertyStatus,
-  Lease,
-} from "../database/models";
+import { Property, PropertyType, PropertyStatus } from "../database/models";
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
 
 export class PropertyController {
@@ -13,7 +8,7 @@ export class PropertyController {
 
   async createProperty(req: Request, res: Response): Promise<void> {
     try {
-      const { name, address, type, status } = req.body;
+      const { name, address, type, status, monthlyRent } = req.body;
       const ownerId = req.user!.id;
 
       const property = this.propertyRepository.create({
@@ -21,6 +16,7 @@ export class PropertyController {
         address,
         type,
         status: status || PropertyStatus.ACTIVE,
+        monthlyRent,
         ownerId,
       });
 
@@ -106,7 +102,7 @@ export class PropertyController {
 
       const property = await this.propertyRepository.findOne({
         where: { id, ownerId },
-        relations: ["tenants", "leases", "owner"],
+        relations: ["tenants", "owner"],
       });
 
       if (!property) {
@@ -205,6 +201,7 @@ export class PropertyController {
 
       const property = await this.propertyRepository.findOne({
         where: { id, ownerId },
+        relations: ["tenants"],
       });
 
       if (!property) {
@@ -215,16 +212,11 @@ export class PropertyController {
         return;
       }
 
-      // Check if property has any active leases
-      const leaseRepository = AppDataSource.getRepository("Lease");
-      const activeLease = await leaseRepository.findOne({
-        where: {
-          propertyId: id,
-          status: "active",
-        },
-      });
-
-      const isAvailable = !activeLease;
+      // Check if property has any active tenants
+      const activeTenant = property.tenants?.find(
+        (tenant) => tenant.status === "active"
+      );
+      const isAvailable = !activeTenant;
 
       res.json({
         success: true,
@@ -232,7 +224,7 @@ export class PropertyController {
         data: {
           propertyId: id,
           isAvailable,
-          currentLease: activeLease || null,
+          currentTenant: activeTenant || null,
         },
       } as ApiResponse);
     } catch (error) {
@@ -248,28 +240,17 @@ export class PropertyController {
     try {
       const ownerId = req.user!.id;
 
-      // Get all properties owned by the user
+      // Get all properties owned by the user with their tenants
       const properties = await this.propertyRepository.find({
         where: { ownerId, status: PropertyStatus.ACTIVE },
+        relations: ["tenants"],
         order: { name: "ASC" },
       });
 
-      // Get all active leases for these properties
-      const leaseRepository = AppDataSource.getRepository(Lease);
-      const activeLeases = await leaseRepository.find({
-        where: {
-          status: "active",
-        },
-        select: ["propertyId"],
-      });
-
-      const rentedPropertyIds = new Set(
-        activeLeases.map((lease) => lease.propertyId)
-      );
-
-      // Filter out properties that have active leases
+      // Filter out properties that have active tenants
       const availableProperties = properties.filter(
-        (property) => !rentedPropertyIds.has(property.id)
+        (property) =>
+          !property.tenants?.some((tenant) => tenant.status === "active")
       );
 
       res.json({

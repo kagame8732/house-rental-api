@@ -1,6 +1,6 @@
 import { DataSource } from "typeorm";
 import { config } from "dotenv";
-import { User, Property, Tenant, Lease, Maintenance } from "./models";
+import { User, Property, Tenant, Maintenance } from "./models";
 
 config();
 
@@ -13,7 +13,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "house_rental",
   synchronize: process.env.NODE_ENV === "development",
   logging: process.env.NODE_ENV === "development",
-  entities: [User, Property, Tenant, Lease, Maintenance],
+  entities: [User, Property, Tenant, Maintenance],
   migrations: ["src/database/migrations/*.ts"],
 });
 

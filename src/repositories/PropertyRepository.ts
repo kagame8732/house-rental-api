@@ -22,25 +22,25 @@ export class PropertyRepository extends BaseRepository<Property> {
   async findAvailableProperties(ownerId: string): Promise<Property[]> {
     return this.repository
       .createQueryBuilder("property")
-      .leftJoin("property.leases", "lease", "lease.status = :status", {
+      .leftJoin("property.tenants", "tenant", "tenant.status = :status", {
         status: "active",
       })
       .where("property.ownerId = :ownerId", { ownerId })
-      .andWhere("lease.id IS NULL")
+      .andWhere("tenant.id IS NULL")
       .getMany();
   }
 
   async checkAvailability(propertyId: string): Promise<boolean> {
-    const activeLease = await this.repository
+    const activeTenant = await this.repository
       .createQueryBuilder("property")
-      .leftJoin("property.leases", "lease", "lease.status = :status", {
+      .leftJoin("property.tenants", "tenant", "tenant.status = :status", {
         status: "active",
       })
       .where("property.id = :propertyId", { propertyId })
-      .andWhere("lease.id IS NULL")
+      .andWhere("tenant.id IS NULL")
       .getOne();
 
-    return !!activeLease;
+    return !!activeTenant;
   }
 
   async findWithPagination(query: PropertyQueryDto, ownerId: string) {
