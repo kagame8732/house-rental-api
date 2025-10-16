@@ -45,6 +45,16 @@ export class Tenant {
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   payment: number;
 
+  @Column({ type: "date", nullable: true })
+  paymentDate: Date;
+
+  @Column({ 
+    type: "enum", 
+    enum: ["cash", "bank", "mobile_money"], 
+    nullable: true 
+  })
+  paymentMethod: "cash" | "bank" | "mobile_money";
+
   @Column({ type: "uuid" })
   propertyId: string;
 

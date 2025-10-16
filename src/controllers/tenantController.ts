@@ -8,7 +8,7 @@ export class TenantController {
 
   async createTenant(req: Request, res: Response): Promise<void> {
     try {
-      const { name, phone, email, address, propertyId, status } = req.body;
+      const { name, phone, email, address, propertyId, status, payment, paymentDate, paymentMethod } = req.body;
       const ownerId = req.user!.id;
 
       // Verify property belongs to owner
@@ -49,6 +49,9 @@ export class TenantController {
         address,
         propertyId,
         status: status || TenantStatus.ACTIVE,
+        payment: payment ? parseFloat(payment) : null,
+        paymentDate: paymentDate ? new Date(paymentDate) : null,
+        paymentMethod: paymentMethod || null,
       });
 
       const savedTenant = await this.tenantRepository.save(tenant);
@@ -241,7 +244,21 @@ export class TenantController {
         }
       }
 
-      Object.assign(tenant, updateData);
+      // Handle payment fields properly
+      if (updateData.payment !== undefined) {
+        tenant.payment = updateData.payment ? parseFloat(updateData.payment) : null;
+      }
+      if (updateData.paymentDate !== undefined) {
+        tenant.paymentDate = updateData.paymentDate ? new Date(updateData.paymentDate) : null;
+      }
+      if (updateData.paymentMethod !== undefined) {
+        tenant.paymentMethod = updateData.paymentMethod || null;
+      }
+
+      // Handle other fields
+      const { payment, paymentDate, paymentMethod, ...otherFields } = updateData;
+      Object.assign(tenant, otherFields);
+      
       const updatedTenant = await this.tenantRepository.save(tenant);
 
       res.json({

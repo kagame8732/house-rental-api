@@ -5,6 +5,8 @@ import {
   IsNumber,
   Min,
   Max,
+  IsDateString,
+  IsEnum,
 } from "class-validator";
 
 // DTOs for Property
@@ -103,6 +105,14 @@ export class CreateTenantDto {
   @IsOptional()
   @IsNumber()
   payment?: number;
+
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: string;
+
+  @IsOptional()
+  @IsEnum(["cash", "bank", "mobile_money"])
+  paymentMethod?: "cash" | "bank" | "mobile_money";
 }
 
 export class UpdateTenantDto {
@@ -129,6 +139,14 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsNumber()
   payment?: number;
+
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: string;
+
+  @IsOptional()
+  @IsEnum(["cash", "bank", "mobile_money"])
+  paymentMethod?: "cash" | "bank" | "mobile_money";
 }
 
 export class TenantQueryDto {
