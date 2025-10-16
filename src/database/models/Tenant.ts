@@ -29,6 +29,9 @@ export class Tenant {
   // @Unique(["phone"])
   phone: string;
 
+  @Column({ type: "varchar", length: 50 })
+  idNumber: string;
+
   @Column({ type: "varchar", length: 100, nullable: true })
   email: string;
 
@@ -48,12 +51,24 @@ export class Tenant {
   @Column({ type: "date", nullable: true })
   paymentDate: Date;
 
-  @Column({ 
-    type: "enum", 
-    enum: ["cash", "bank", "mobile_money"], 
-    nullable: true 
+  @Column({
+    type: "enum",
+    enum: ["cash", "bank", "mobile_money"],
+    nullable: true,
   })
   paymentMethod: "cash" | "bank" | "mobile_money";
+
+  @Column({ type: "integer", default: 0 })
+  monthsPaid: number;
+
+  @Column({ type: "date", nullable: true })
+  stayStartDate: Date;
+
+  @Column({ type: "date", nullable: true })
+  stayEndDate: Date;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  totalAmount: number;
 
   @Column({ type: "uuid" })
   propertyId: string;
