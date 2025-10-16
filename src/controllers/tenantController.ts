@@ -8,7 +8,21 @@ export class TenantController {
 
   async createTenant(req: Request, res: Response): Promise<void> {
     try {
-      const { name, phone, email, address, propertyId, status } = req.body;
+      const {
+        name,
+        phone,
+        email,
+        address,
+        propertyId,
+        status,
+        payment,
+        paymentDate,
+        paymentMethod,
+        monthsPaid,
+        stayStartDate,
+        stayEndDate,
+        idNumber,
+      } = req.body;
       const ownerId = req.user!.id;
 
       // Verify property belongs to owner
@@ -42,6 +56,19 @@ export class TenantController {
         return;
       }
 
+      // Calculate total amount based on months paid and monthly rent
+      const monthlyRent = property.monthlyRent || 0;
+      const months = monthsPaid || 0;
+      const totalAmount = monthlyRent * months;
+
+      // Calculate stay end date based on start date and months paid
+      let calculatedStayEndDate = null;
+      if (stayStartDate && months > 0) {
+        const startDate = new Date(stayStartDate);
+        startDate.setMonth(startDate.getMonth() + months);
+        calculatedStayEndDate = startDate;
+      }
+
       const tenant = this.tenantRepository.create({
         name,
         phone,
@@ -49,6 +76,16 @@ export class TenantController {
         address,
         propertyId,
         status: status || TenantStatus.ACTIVE,
+        payment: payment ? parseFloat(payment) : null,
+        paymentDate: paymentDate ? new Date(paymentDate) : null,
+        paymentMethod: paymentMethod || null,
+        monthsPaid: months,
+        stayStartDate: stayStartDate ? new Date(stayStartDate) : null,
+        stayEndDate: stayEndDate
+          ? new Date(stayEndDate)
+          : calculatedStayEndDate,
+        totalAmount: totalAmount,
+        idNumber: idNumber || null,
       });
 
       const savedTenant = await this.tenantRepository.save(tenant);
@@ -241,7 +278,78 @@ export class TenantController {
         }
       }
 
-      Object.assign(tenant, updateData);
+      // Handle payment fields properly
+      if (updateData.payment !== undefined) {
+        tenant.payment = updateData.payment
+          ? parseFloat(updateData.payment)
+          : null;
+      }
+      if (updateData.paymentDate !== undefined) {
+        tenant.paymentDate = updateData.paymentDate
+          ? new Date(updateData.paymentDate)
+          : null;
+      }
+      if (updateData.paymentMethod !== undefined) {
+        tenant.paymentMethod = updateData.paymentMethod || null;
+      }
+
+      // Handle new payment tracking fields
+      if (updateData.monthsPaid !== undefined) {
+        tenant.monthsPaid = updateData.monthsPaid || 0;
+      }
+      if (updateData.stayStartDate !== undefined) {
+        tenant.stayStartDate = updateData.stayStartDate
+          ? new Date(updateData.stayStartDate)
+          : null;
+      }
+      if (updateData.stayEndDate !== undefined) {
+        tenant.stayEndDate = updateData.stayEndDate
+          ? new Date(updateData.stayEndDate)
+          : null;
+      }
+
+      // Recalculate total amount if months paid or property changes
+      if (
+        updateData.monthsPaid !== undefined ||
+        updateData.propertyId !== undefined
+      ) {
+        const propertyRepository = AppDataSource.getRepository(Property);
+        const currentProperty = await propertyRepository.findOne({
+          where: { id: tenant.propertyId },
+        });
+
+        if (currentProperty) {
+          const monthlyRent = currentProperty.monthlyRent || 0;
+          const months = tenant.monthsPaid || 0;
+          tenant.totalAmount = monthlyRent * months;
+
+          // Recalculate stay end date if start date and months are available
+          if (tenant.stayStartDate && months > 0) {
+            const startDate = new Date(tenant.stayStartDate);
+            startDate.setMonth(startDate.getMonth() + months);
+            tenant.stayEndDate = startDate;
+          }
+        }
+      }
+
+      // Handle ID Number field
+      if (updateData.idNumber !== undefined) {
+        tenant.idNumber = updateData.idNumber || null;
+      }
+
+      // Handle other fields
+      const {
+        payment,
+        paymentDate,
+        paymentMethod,
+        monthsPaid,
+        stayStartDate,
+        stayEndDate,
+        idNumber,
+        ...otherFields
+      } = updateData;
+      Object.assign(tenant, otherFields);
+
       const updatedTenant = await this.tenantRepository.save(tenant);
 
       res.json({

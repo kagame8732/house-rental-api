@@ -5,6 +5,10 @@ import {
   IsNumber,
   Min,
   Max,
+  IsDateString,
+  IsEnum,
+  Length,
+  Matches,
 } from "class-validator";
 
 // DTOs for Property
@@ -94,6 +98,11 @@ export class CreateTenantDto {
   phone!: string;
 
   @IsString()
+  @Length(16, 16, { message: "ID Number must be exactly 16 digits" })
+  @Matches(/^\d{16}$/, { message: "ID Number must contain only digits" })
+  idNumber!: string;
+
+  @IsString()
   propertyId!: string;
 
   @IsOptional()
@@ -103,6 +112,27 @@ export class CreateTenantDto {
   @IsOptional()
   @IsNumber()
   payment?: number;
+
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: string;
+
+  @IsOptional()
+  @IsEnum(["cash", "bank", "mobile_money"])
+  paymentMethod?: "cash" | "bank" | "mobile_money";
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  monthsPaid?: number;
+
+  @IsOptional()
+  @IsDateString()
+  stayStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  stayEndDate?: string;
 }
 
 export class UpdateTenantDto {
@@ -120,6 +150,12 @@ export class UpdateTenantDto {
 
   @IsOptional()
   @IsString()
+  @Length(16, 16, { message: "ID Number must be exactly 16 digits" })
+  @Matches(/^\d{16}$/, { message: "ID Number must contain only digits" })
+  idNumber?: string;
+
+  @IsOptional()
+  @IsString()
   propertyId?: string;
 
   @IsOptional()
@@ -129,6 +165,27 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsNumber()
   payment?: number;
+
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: string;
+
+  @IsOptional()
+  @IsEnum(["cash", "bank", "mobile_money"])
+  paymentMethod?: "cash" | "bank" | "mobile_money";
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  monthsPaid?: number;
+
+  @IsOptional()
+  @IsDateString()
+  stayStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  stayEndDate?: string;
 }
 
 export class TenantQueryDto {
