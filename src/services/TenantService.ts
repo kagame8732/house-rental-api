@@ -1,3 +1,4 @@
+import { In } from "typeorm";
 import { TenantRepository, PropertyRepository } from "../repositories";
 import { Tenant, TenantStatus, Property } from "../database/models";
 import { CreateTenantDto, UpdateTenantDto, TenantQueryDto } from "../dto";
@@ -42,7 +43,7 @@ export class TenantService {
 
       const tenant = await this.tenantRepository.create({
         ...data,
-        status: data.status || TenantStatus.ACTIVE,
+        status: (data.status as TenantStatus) || TenantStatus.ACTIVE,
       });
 
       return {
@@ -98,7 +99,7 @@ export class TenantService {
       const propertyIds = properties.map((p) => p.id);
 
       const tenant = await this.tenantRepository.findOne({
-        where: { id, propertyId: { $in: propertyIds } } as any,
+        where: { id, propertyId: In(propertyIds) },
         relations: ["property"],
       });
 
@@ -134,7 +135,7 @@ export class TenantService {
       const propertyIds = properties.map((p) => p.id);
 
       const existingTenant = await this.tenantRepository.findOne({
-        where: { id, propertyId: { $in: propertyIds } } as any,
+        where: { id, propertyId: In(propertyIds) },
       });
 
       if (!existingTenant) {
@@ -168,7 +169,10 @@ export class TenantService {
         }
       }
 
-      const updatedTenant = await this.tenantRepository.update(id, data);
+      const updatedTenant = await this.tenantRepository.update(id, {
+        ...data,
+        status: data.status as TenantStatus | undefined,
+      });
 
       if (!updatedTenant) {
         return {
@@ -198,7 +202,7 @@ export class TenantService {
       const propertyIds = properties.map((p) => p.id);
 
       const tenant = await this.tenantRepository.findOne({
-        where: { id, propertyId: { $in: propertyIds } } as any,
+        where: { id, propertyId: In(propertyIds) },
       });
 
       if (!tenant) {

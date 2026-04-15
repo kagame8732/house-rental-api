@@ -1,5 +1,5 @@
 import { PropertyRepository } from "../repositories";
-import { Property, PropertyStatus } from "../database/models";
+import { Property, PropertyStatus, PropertyType } from "../database/models";
 import { CreatePropertyDto, UpdatePropertyDto, PropertyQueryDto } from "../dto";
 import { ApiResponse } from "../types";
 
@@ -17,7 +17,8 @@ export class PropertyService {
     try {
       const property = await this.propertyRepository.create({
         ...data,
-        status: data.status || PropertyStatus.ACTIVE,
+        type: (data.type as PropertyType) || PropertyType.HOUSE,
+        status: (data.status as PropertyStatus) || PropertyStatus.ACTIVE,
         ownerId,
       });
 
@@ -107,7 +108,11 @@ export class PropertyService {
         };
       }
 
-      await this.propertyRepository.update(id, data);
+      await this.propertyRepository.update(id, {
+        ...data,
+        type: data.type as PropertyType | undefined,
+        status: data.status as PropertyStatus | undefined,
+      });
 
       // Fetch the updated property
       const updatedProperty = await this.propertyRepository.findOne({

@@ -52,16 +52,16 @@ export class Maintenance {
   propertyId: string;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  cost: number;
+  cost: number | null;
 
   @Column({ type: "date", nullable: true })
-  scheduledDate: Date;
+  scheduledDate: Date | null;
 
   @Column({ type: "date", nullable: true })
-  completedDate: Date;
+  completedDate: Date | null;
 
   @Column({ type: "text", nullable: true })
-  notes: string;
+  notes: string | null;
 
   @ManyToOne(() => Property, (property) => property.id)
   @JoinColumn({ name: "propertyId" })

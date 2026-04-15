@@ -43,7 +43,7 @@ export class TenantController {
       const existingTenant = await this.tenantRepository.findOne({
         where: {
           propertyId,
-          status: "active",
+          status: TenantStatus.ACTIVE,
         },
       });
 
@@ -85,7 +85,7 @@ export class TenantController {
           ? new Date(stayEndDate)
           : calculatedStayEndDate,
         totalAmount: totalAmount,
-        idNumber: idNumber || null,
+        idNumber,
       });
 
       const savedTenant = await this.tenantRepository.save(tenant);
@@ -193,7 +193,7 @@ export class TenantController {
 
   async getTenantById(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const tenant = await this.tenantRepository.findOne({
@@ -225,7 +225,7 @@ export class TenantController {
 
   async updateTenant(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
       const updateData = req.body;
 
@@ -264,7 +264,7 @@ export class TenantController {
         const existingTenant = await this.tenantRepository.findOne({
           where: {
             propertyId: updateData.propertyId,
-            status: "active",
+            status: TenantStatus.ACTIVE,
           },
         });
 
@@ -368,7 +368,7 @@ export class TenantController {
 
   async deleteTenant(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const tenant = await this.tenantRepository.findOne({

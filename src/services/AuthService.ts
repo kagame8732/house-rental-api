@@ -65,14 +65,14 @@ export class AuthService {
 
   async register(data: RegisterDto): Promise<ApiResponse<User>> {
     try {
-      const { name, email, phone, password } = data;
+      const { name, phone, password } = data;
 
       // Check if user already exists
-      const existingUser = await this.userRepository.findByEmail(email);
+      const existingUser = await this.userRepository.findByPhone(phone);
       if (existingUser) {
         return {
           success: false,
-          message: "User already exists with this email",
+          message: "User already exists with this phone number",
         };
       }
 
@@ -82,7 +82,6 @@ export class AuthService {
       // Create user
       const user = await this.userRepository.create({
         name,
-        email,
         phone,
         password: hashedPassword,
         role: UserRole.OWNER,

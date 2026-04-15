@@ -1,3 +1,4 @@
+import { In } from "typeorm";
 import { MaintenanceRepository, PropertyRepository } from "../repositories";
 import {
   Maintenance,
@@ -39,7 +40,9 @@ export class MaintenanceService {
 
       const maintenance = await this.maintenanceRepository.create({
         ...data,
-        status: data.status || MaintenanceStatus.PENDING,
+        priority:
+          (data.priority as MaintenancePriority) || MaintenancePriority.MEDIUM,
+        status: (data.status as MaintenanceStatus) || MaintenanceStatus.PENDING,
       });
 
       return {
@@ -95,7 +98,7 @@ export class MaintenanceService {
       const propertyIds = properties.map((p) => p.id);
 
       const maintenance = await this.maintenanceRepository.findOne({
-        where: { id, propertyId: { $in: propertyIds } } as any,
+        where: { id, propertyId: In(propertyIds) },
         relations: ["property"],
       });
 
@@ -131,7 +134,7 @@ export class MaintenanceService {
       const propertyIds = properties.map((p) => p.id);
 
       const existingMaintenance = await this.maintenanceRepository.findOne({
-        where: { id, propertyId: { $in: propertyIds } } as any,
+        where: { id, propertyId: In(propertyIds) },
       });
 
       if (!existingMaintenance) {
@@ -160,7 +163,11 @@ export class MaintenanceService {
 
       const updatedMaintenance = await this.maintenanceRepository.update(
         id,
-        data
+        {
+          ...data,
+          priority: data.priority as MaintenancePriority | undefined,
+          status: data.status as MaintenanceStatus | undefined,
+        }
       );
 
       if (!updatedMaintenance) {
@@ -194,7 +201,7 @@ export class MaintenanceService {
       const propertyIds = properties.map((p) => p.id);
 
       const maintenance = await this.maintenanceRepository.findOne({
-        where: { id, propertyId: { $in: propertyIds } } as any,
+        where: { id, propertyId: In(propertyIds) },
       });
 
       if (!maintenance) {
