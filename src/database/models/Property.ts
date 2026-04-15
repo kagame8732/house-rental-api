@@ -46,7 +46,7 @@ export class Property {
   status: PropertyStatus;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  monthlyRent: number;
+  monthlyRent: number | null;
 
   @Column({ type: "uuid" })
   ownerId: string;

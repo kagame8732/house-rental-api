@@ -33,10 +33,10 @@ export class Tenant {
   idNumber: string;
 
   @Column({ type: "varchar", length: 100, nullable: true })
-  email: string;
+  email: string | null;
 
   @Column({ type: "text", nullable: true })
-  address: string;
+  address: string | null;
 
   @Column({
     type: "enum",
@@ -46,29 +46,29 @@ export class Tenant {
   status: TenantStatus;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  payment: number;
+  payment: number | null;
 
   @Column({ type: "date", nullable: true })
-  paymentDate: Date;
+  paymentDate: Date | null;
 
   @Column({
     type: "enum",
     enum: ["cash", "bank", "mobile_money"],
     nullable: true,
   })
-  paymentMethod: "cash" | "bank" | "mobile_money";
+  paymentMethod: "cash" | "bank" | "mobile_money" | null;
 
   @Column({ type: "integer", default: 0 })
   monthsPaid: number;
 
   @Column({ type: "date", nullable: true })
-  stayStartDate: Date;
+  stayStartDate: Date | null;
 
   @Column({ type: "date", nullable: true })
-  stayEndDate: Date;
+  stayEndDate: Date | null;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  totalAmount: number;
+  totalAmount: number | null;
 
   @Column({ type: "uuid" })
   propertyId: string;

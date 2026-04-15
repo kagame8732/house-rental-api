@@ -1,32 +1,43 @@
-import { Repository, FindManyOptions, FindOptionsWhere } from "typeorm";
+import {
+  Repository,
+  FindManyOptions,
+  FindOneOptions,
+  FindOptionsWhere,
+  ObjectLiteral,
+  EntityTarget,
+  DeepPartial,
+  QueryDeepPartialEntity,
+} from "typeorm";
 import { AppDataSource } from "../database";
 
-export abstract class BaseRepository<T> {
+export abstract class BaseRepository<T extends ObjectLiteral> {
   protected repository: Repository<T>;
 
-  constructor(entity: new () => T) {
+  constructor(entity: EntityTarget<T>) {
     this.repository = AppDataSource.getRepository(entity);
   }
 
   async findById(id: string): Promise<T | null> {
-    return this.repository.findOne({ where: { id } as FindOptionsWhere<T> });
+    return this.repository.findOne({
+      where: { id } as unknown as FindOptionsWhere<T>,
+    });
   }
 
   async findMany(options: FindManyOptions<T>): Promise<T[]> {
     return this.repository.find(options);
   }
 
-  async findOne(options: FindManyOptions<T>): Promise<T | null> {
+  async findOne(options: FindOneOptions<T>): Promise<T | null> {
     return this.repository.findOne(options);
   }
 
-  async create(data: Partial<T>): Promise<T> {
+  async create(data: DeepPartial<T>): Promise<T> {
     const entity = this.repository.create(data);
     return this.repository.save(entity);
   }
 
-  async update(id: string, data: Partial<T>): Promise<T | null> {
-    await this.repository.update(id, data);
+  async update(id: string, data: QueryDeepPartialEntity<T>): Promise<T | null> {
+    await this.repository.update(id as any, data);
     return this.findById(id);
   }
 

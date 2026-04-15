@@ -161,7 +161,7 @@ export class MaintenanceController {
 
   async getMaintenanceById(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const maintenance = await this.maintenanceRepository.findOne({
@@ -199,7 +199,7 @@ export class MaintenanceController {
 
   async updateMaintenance(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
       const updateData = req.body;
 
@@ -245,7 +245,7 @@ export class MaintenanceController {
 
   async deleteMaintenance(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const maintenance = await this.maintenanceRepository.findOne({

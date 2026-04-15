@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../database";
-import { Property, PropertyType, PropertyStatus } from "../database/models";
+import {
+  Property,
+  PropertyType,
+  PropertyStatus,
+  TenantStatus,
+} from "../database/models";
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
 
 export class PropertyController {
@@ -97,7 +102,7 @@ export class PropertyController {
 
   async getPropertyById(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const property = await this.propertyRepository.findOne({
@@ -129,7 +134,7 @@ export class PropertyController {
 
   async updateProperty(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
       const updateData = req.body;
 
@@ -164,7 +169,7 @@ export class PropertyController {
 
   async deleteProperty(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const property = await this.propertyRepository.findOne({
@@ -196,7 +201,7 @@ export class PropertyController {
 
   async checkPropertyAvailability(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const ownerId = req.user!.id;
 
       const property = await this.propertyRepository.findOne({
@@ -214,7 +219,7 @@ export class PropertyController {
 
       // Check if property has any active tenants
       const activeTenant = property.tenants?.find(
-        (tenant) => tenant.status === "active"
+        (tenant) => tenant.status === TenantStatus.ACTIVE
       );
       const isAvailable = !activeTenant;
 
@@ -250,7 +255,9 @@ export class PropertyController {
       // Filter out properties that have active tenants
       const availableProperties = properties.filter(
         (property) =>
-          !property.tenants?.some((tenant) => tenant.status === "active")
+          !property.tenants?.some(
+            (tenant) => tenant.status === TenantStatus.ACTIVE
+          )
       );
 
       res.json({
