@@ -12,9 +12,35 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const corsOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Middleware
-app.use(cors({ origin: "*" }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser clients (no Origin header) and localhost-style tooling.
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (corsOrigins.length === 0 || corsOrigins.includes("*")) {
+        callback(null, true);
+        return;
+      }
+
+      if (corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
