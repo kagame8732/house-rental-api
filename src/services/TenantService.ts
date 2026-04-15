@@ -172,6 +172,11 @@ export class TenantService {
       const updatedTenant = await this.tenantRepository.update(id, {
         ...data,
         status: data.status as TenantStatus | undefined,
+        paymentDate: data.paymentDate ? new Date(data.paymentDate) : undefined,
+        stayStartDate: data.stayStartDate
+          ? new Date(data.stayStartDate)
+          : undefined,
+        stayEndDate: data.stayEndDate ? new Date(data.stayEndDate) : undefined,
       });
 
       if (!updatedTenant) {
