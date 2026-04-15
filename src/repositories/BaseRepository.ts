@@ -6,7 +6,6 @@ import {
   ObjectLiteral,
   EntityTarget,
   DeepPartial,
-  QueryDeepPartialEntity,
 } from "typeorm";
 import { AppDataSource } from "../database";
 
@@ -36,8 +35,8 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     return this.repository.save(entity);
   }
 
-  async update(id: string, data: QueryDeepPartialEntity<T>): Promise<T | null> {
-    await this.repository.update(id as any, data);
+  async update(id: string, data: Partial<T>): Promise<T | null> {
+    await this.repository.update(id as any, data as any);
     return this.findById(id);
   }
 
