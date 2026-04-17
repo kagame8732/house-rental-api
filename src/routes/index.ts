@@ -3,6 +3,7 @@ import authRoutes from "./auth";
 import propertyRoutes from "./properties";
 import tenantRoutes from "./tenants";
 import maintenanceRoutes from "./maintenance";
+import reportRoutes from "./reports";
 
 const router = Router();
 
@@ -11,6 +12,7 @@ router.use("/auth", authRoutes);
 router.use("/properties", propertyRoutes);
 router.use("/tenants", tenantRoutes);
 router.use("/maintenance", maintenanceRoutes);
+router.use("/reports", reportRoutes);
 
 // Health check endpoint
 router.get("/health", (req, res) => {
