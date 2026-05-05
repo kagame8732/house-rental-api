@@ -11,6 +11,22 @@ import {
 } from "../database/models";
 import { ApiResponse } from "../types";
 
+type PaymentMonthStatus = "paid" | "pending" | "late_unpaid" | "not_yet_due";
+
+interface PaymentReportMonth {
+  month: number;
+  amount: number;
+  status: PaymentMonthStatus;
+}
+
+interface PaymentReportTenant {
+  id: string;
+  name: string;
+  monthlyRent: number;
+  totalPaid: number;
+  months: PaymentReportMonth[];
+}
+
 interface ReportOverview {
   totals: {
     properties: number;
@@ -30,6 +46,17 @@ interface ReportOverview {
     maintenanceStatus: Record<string, number>;
     maintenancePriority: Record<string, number>;
   };
+  annualPayment: {
+    year: number;
+    activeTenants: number;
+    tenants: PaymentReportTenant[];
+    monthlyTotals: number[];
+    collectedYtd: number;
+    paidOnTime: number;
+    dueMonths: number;
+    latePayments: number;
+    unpaidMonths: number;
+  };
 }
 
 export class ReportController {
@@ -37,9 +64,77 @@ export class ReportController {
   private tenantRepository = AppDataSource.getRepository(Tenant);
   private maintenanceRepository = AppDataSource.getRepository(Maintenance);
 
+  private getDueMonthLimit(year: number): number {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    if (year < currentYear) {
+      return 11;
+    }
+
+    if (year > currentYear) {
+      return -1;
+    }
+
+    return now.getMonth();
+  }
+
+  private buildTenantPaymentMonths(
+    tenant: Tenant,
+    monthlyRent: number,
+    year: number,
+    dueMonthLimit: number
+  ): PaymentReportMonth[] {
+    const monthsPaid = Number(tenant.monthsPaid || 0);
+    const stayStartDate = tenant.stayStartDate
+      ? new Date(tenant.stayStartDate)
+      : null;
+
+    return Array.from({ length: 12 }, (_, monthIndex) => {
+      const monthDate = new Date(year, monthIndex, 1);
+      const isDue = monthIndex <= dueMonthLimit;
+      let paidMonth = false;
+
+      if (stayStartDate && monthsPaid > 0) {
+        const monthsSinceStart =
+          (monthDate.getFullYear() - stayStartDate.getFullYear()) * 12 +
+          (monthDate.getMonth() - stayStartDate.getMonth());
+
+        paidMonth = monthsSinceStart >= 0 && monthsSinceStart < monthsPaid;
+      }
+
+      if (paidMonth) {
+        return {
+          month: monthIndex + 1,
+          amount: monthlyRent,
+          status: "paid",
+        };
+      }
+
+      if (isDue) {
+        return {
+          month: monthIndex + 1,
+          amount: 0,
+          status: "late_unpaid",
+        };
+      }
+
+      return {
+        month: monthIndex + 1,
+        amount: 0,
+        status: "not_yet_due",
+      };
+    });
+  }
+
   async getOverview(req: Request, res: Response): Promise<void> {
     try {
       const ownerId = req.user!.id;
+      const requestedYear = Number(req.query.year);
+      const year = Number.isInteger(requestedYear)
+        ? requestedYear
+        : new Date().getFullYear();
+      const dueMonthLimit = this.getDueMonthLimit(year);
 
       const [properties, tenants, maintenance] = await Promise.all([
         this.propertyRepository.find({
@@ -52,10 +147,13 @@ export class ReportController {
           .where("property.ownerId = :ownerId", { ownerId })
           .select([
             "tenant.id",
+            "tenant.name",
             "tenant.status",
             "tenant.totalAmount",
             "tenant.payment",
             "tenant.propertyId",
+            "tenant.monthsPaid",
+            "tenant.stayStartDate",
           ])
           .getMany(),
         this.maintenanceRepository
@@ -87,6 +185,44 @@ export class ReportController {
         0
       );
       const outstandingAmount = Math.max(0, expectedMonthlyRent - collectedAmount);
+      const paymentTenants: PaymentReportTenant[] = tenants
+        .filter((tenant) => tenant.status === TenantStatus.ACTIVE)
+        .map((tenant) => {
+          const property = properties.find((item) => item.id === tenant.propertyId);
+          const monthlyRent = Number(property?.monthlyRent || 0);
+          const months = this.buildTenantPaymentMonths(
+            tenant,
+            monthlyRent,
+            year,
+            dueMonthLimit
+          );
+
+          return {
+            id: tenant.id,
+            name: tenant.name,
+            monthlyRent,
+            totalPaid: months.reduce((total, month) => total + month.amount, 0),
+            months,
+          };
+        });
+      const monthlyTotals = Array.from({ length: 12 }, (_, monthIndex) =>
+        paymentTenants.reduce(
+          (total, tenant) => total + tenant.months[monthIndex].amount,
+          0
+        )
+      );
+      const collectedYtd = monthlyTotals.reduce((total, amount) => total + amount, 0);
+      const paidOnTime = paymentTenants.reduce(
+        (total, tenant) =>
+          total + tenant.months.filter((month) => month.status === "paid").length,
+        0
+      );
+      const unpaidMonths = paymentTenants.reduce(
+        (total, tenant) =>
+          total +
+          tenant.months.filter((month) => month.status === "late_unpaid").length,
+        0
+      );
 
       const report: ReportOverview = {
         totals: {
@@ -142,6 +278,17 @@ export class ReportController {
               (item) => item.priority === MaintenancePriority.URGENT
             ).length,
           },
+        },
+        annualPayment: {
+          year,
+          activeTenants: paymentTenants.length,
+          tenants: paymentTenants,
+          monthlyTotals,
+          collectedYtd,
+          paidOnTime,
+          dueMonths: paidOnTime + unpaidMonths,
+          latePayments: 0,
+          unpaidMonths,
         },
       };
 
