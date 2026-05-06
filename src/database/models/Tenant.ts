@@ -18,6 +18,12 @@ export enum TenantStatus {
   EVICTED = "evicted",
 }
 
+export enum TenantPaymentStatus {
+  PENDING = "pending",
+  PAID = "paid",
+  LATE = "late",
+}
+
 @Entity("tenants")
 export class Tenant {
   @PrimaryGeneratedColumn("uuid")
@@ -61,6 +67,13 @@ export class Tenant {
     nullable: true,
   })
   paymentMethod: "cash" | "bank" | "mobile_money" | null;
+
+  @Column({
+    type: "enum",
+    enum: TenantPaymentStatus,
+    default: TenantPaymentStatus.PENDING,
+  })
+  paymentStatus: TenantPaymentStatus;
 
   @Column({ type: "integer", default: 0 })
   monthsPaid: number;

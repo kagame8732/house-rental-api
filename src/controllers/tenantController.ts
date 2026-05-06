@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../database";
-import { Property, Tenant, TenantStatus } from "../database/models";
+import { Property, Tenant, TenantPaymentStatus, TenantStatus } from "../database/models";
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
 
 type PaymentMethod = "cash" | "bank" | "mobile_money";
@@ -10,6 +10,7 @@ interface RecordPaymentBody {
   monthsPaid?: number | string;
   paymentDate?: string;
   paymentMethod?: PaymentMethod;
+  paymentStatus?: TenantPaymentStatus;
   stayStartDate?: string;
 }
 
@@ -87,6 +88,7 @@ export class TenantController {
           payment !== undefined && payment !== "" ? Number(payment) : monthlyRent || null,
         paymentDate: paymentDate ? new Date(paymentDate) : null,
         paymentMethod: paymentMethod || null,
+        paymentStatus: TenantPaymentStatus.PENDING,
         monthsPaid: paidMonths,
         stayStartDate: startDate,
         stayEndDate: stayEndDate ? new Date(stayEndDate) : calculatedStayEndDate,
@@ -353,6 +355,7 @@ export class TenantController {
         monthsPaid = 1,
         paymentDate,
         paymentMethod,
+        paymentStatus,
         stayStartDate,
       } = req.body as RecordPaymentBody;
 
@@ -410,6 +413,7 @@ export class TenantController {
       tenant.payment = paymentAmount;
       tenant.paymentDate = paidAt;
       tenant.paymentMethod = paymentMethod;
+      tenant.paymentStatus = paymentStatus || TenantPaymentStatus.PAID;
       tenant.monthsPaid = totalMonthsPaid;
       tenant.stayStartDate = effectiveStayStartDate;
       tenant.stayEndDate = this.addMonths(effectiveStayStartDate, totalMonthsPaid);

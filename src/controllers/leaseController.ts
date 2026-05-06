@@ -82,8 +82,8 @@ export class LeaseController {
 
       const queryBuilder = this.leaseRepository
         .createQueryBuilder("lease")
-        .leftJoin("lease.property", "property")
-        .leftJoin("lease.tenant", "tenant")
+        .leftJoinAndSelect("lease.property", "property")
+        .leftJoinAndSelect("lease.tenant", "tenant")
         .where("property.ownerId = :ownerId", { ownerId });
 
       if (search) {
@@ -107,8 +107,6 @@ export class LeaseController {
 
       const total = await queryBuilder.getCount();
       const leases = await queryBuilder
-        .leftJoinAndSelect("lease.property", "property")
-        .leftJoinAndSelect("lease.tenant", "tenant")
         .orderBy(`lease.${sortBy}`, sortOrder)
         .skip((page - 1) * limit)
         .take(limit)
