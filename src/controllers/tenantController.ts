@@ -1,16 +1,33 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../database";
-import { Tenant, TenantStatus, Property } from "../database/models";
+import { Property, Tenant, TenantStatus } from "../database/models";
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
+
+type PaymentMethod = "cash" | "bank" | "mobile_money";
+
+interface RecordPaymentBody {
+  amount?: number | string;
+  monthsPaid?: number | string;
+  paymentDate?: string;
+  paymentMethod?: PaymentMethod;
+  stayStartDate?: string;
+}
 
 export class TenantController {
   private tenantRepository = AppDataSource.getRepository(Tenant);
+
+  private addMonths(date: Date, months: number): Date {
+    const nextDate = new Date(date);
+    nextDate.setMonth(nextDate.getMonth() + months);
+    return nextDate;
+  }
 
   async createTenant(req: Request, res: Response): Promise<void> {
     try {
       const {
         name,
         phone,
+        idNumber,
         email,
         address,
         propertyId,
@@ -21,7 +38,6 @@ export class TenantController {
         monthsPaid,
         stayStartDate,
         stayEndDate,
-        idNumber,
       } = req.body;
       const ownerId = req.user!.id;
 
@@ -39,15 +55,11 @@ export class TenantController {
         return;
       }
 
-      // Check if property is available (not already rented)
-      const existingTenant = await this.tenantRepository.findOne({
-        where: {
-          propertyId,
-          status: TenantStatus.ACTIVE,
-        },
+      const activeTenant = await this.tenantRepository.findOne({
+        where: { propertyId, status: TenantStatus.ACTIVE },
       });
 
-      if (existingTenant) {
+      if (activeTenant) {
         res.status(400).json({
           success: false,
           message:
@@ -56,36 +68,29 @@ export class TenantController {
         return;
       }
 
-      // Calculate total amount based on months paid and monthly rent
-      const monthlyRent = property.monthlyRent || 0;
-      const months = monthsPaid || 0;
-      const totalAmount = monthlyRent * months;
-
-      // Calculate stay end date based on start date and months paid
-      let calculatedStayEndDate = null;
-      if (stayStartDate && months > 0) {
-        const startDate = new Date(stayStartDate);
-        startDate.setMonth(startDate.getMonth() + months);
-        calculatedStayEndDate = startDate;
-      }
+      const paidMonths = Number(monthsPaid || 0);
+      const monthlyRent = Number(property.monthlyRent || 0);
+      const totalAmount = paidMonths > 0 ? monthlyRent * paidMonths : 0;
+      const startDate = stayStartDate ? new Date(stayStartDate) : null;
+      const calculatedStayEndDate =
+        startDate && paidMonths > 0 ? this.addMonths(startDate, paidMonths) : null;
 
       const tenant = this.tenantRepository.create({
         name,
         phone,
+        idNumber: idNumber || null,
         email,
         address,
         propertyId,
         status: status || TenantStatus.ACTIVE,
-        payment: payment ? parseFloat(payment) : null,
+        payment:
+          payment !== undefined && payment !== "" ? Number(payment) : monthlyRent || null,
         paymentDate: paymentDate ? new Date(paymentDate) : null,
         paymentMethod: paymentMethod || null,
-        monthsPaid: months,
-        stayStartDate: stayStartDate ? new Date(stayStartDate) : null,
-        stayEndDate: stayEndDate
-          ? new Date(stayEndDate)
-          : calculatedStayEndDate,
-        totalAmount: totalAmount,
-        idNumber,
+        monthsPaid: paidMonths,
+        stayStartDate: startDate,
+        stayEndDate: stayEndDate ? new Date(stayEndDate) : calculatedStayEndDate,
+        totalAmount,
       });
 
       const savedTenant = await this.tenantRepository.save(tenant);
@@ -117,35 +122,10 @@ export class TenantController {
       } = req.query as PaginationQuery & FilterQuery;
       const ownerId = req.user!.id;
 
-      // First get all property IDs owned by this user
-      const propertyRepository = AppDataSource.getRepository(Property);
-      const properties = await propertyRepository.find({
-        where: { ownerId },
-        select: ["id"],
-      });
-
-      const propertyIds = properties.map((p) => p.id);
-
-      if (propertyIds.length === 0) {
-        // No properties owned by this user, return empty result
-        res.json({
-          success: true,
-          message: "Tenants retrieved successfully",
-          data: [],
-          pagination: {
-            page: Number(page),
-            limit: Number(limit),
-            total: 0,
-            totalPages: 0,
-          },
-        } as ApiResponse);
-        return;
-      }
-
       const queryBuilder = this.tenantRepository
         .createQueryBuilder("tenant")
         .leftJoinAndSelect("tenant.property", "property")
-        .where("tenant.propertyId IN (:...propertyIds)", { propertyIds });
+        .where("property.ownerId = :ownerId", { ownerId });
 
       if (search) {
         queryBuilder.andWhere(
@@ -193,12 +173,18 @@ export class TenantController {
 
   async getTenantById(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
 
       const tenant = await this.tenantRepository.findOne({
         where: { id },
-        relations: ["property"],
+        relations: ["property", "leases"],
+        join: {
+          alias: "tenant",
+          leftJoinAndSelect: {
+            property: "tenant.property",
+          },
+        },
       });
 
       if (!tenant || tenant.property.ownerId !== ownerId) {
@@ -225,7 +211,7 @@ export class TenantController {
 
   async updateTenant(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
       const updateData = req.body;
 
@@ -242,11 +228,7 @@ export class TenantController {
         return;
       }
 
-      // If updating property, check if new property is available
-      if (
-        updateData.propertyId &&
-        updateData.propertyId !== tenant.propertyId
-      ) {
+      if (updateData.propertyId && updateData.propertyId !== tenant.propertyId) {
         const propertyRepository = AppDataSource.getRepository(Property);
         const property = await propertyRepository.findOne({
           where: { id: updateData.propertyId, ownerId },
@@ -260,15 +242,11 @@ export class TenantController {
           return;
         }
 
-        // Check if new property is available (not already rented)
-        const existingTenant = await this.tenantRepository.findOne({
-          where: {
-            propertyId: updateData.propertyId,
-            status: TenantStatus.ACTIVE,
-          },
+        const activeTenant = await this.tenantRepository.findOne({
+          where: { propertyId: updateData.propertyId, status: TenantStatus.ACTIVE },
         });
 
-        if (existingTenant) {
+        if (activeTenant && activeTenant.id !== tenant.id) {
           res.status(400).json({
             success: false,
             message:
@@ -278,78 +256,45 @@ export class TenantController {
         }
       }
 
-      // Handle payment fields properly
-      if (updateData.payment !== undefined) {
-        tenant.payment = updateData.payment
-          ? parseFloat(updateData.payment)
-          : null;
-      }
-      if (updateData.paymentDate !== undefined) {
-        tenant.paymentDate = updateData.paymentDate
-          ? new Date(updateData.paymentDate)
-          : null;
-      }
-      if (updateData.paymentMethod !== undefined) {
-        tenant.paymentMethod = updateData.paymentMethod || null;
-      }
-
-      // Handle new payment tracking fields
-      if (updateData.monthsPaid !== undefined) {
-        tenant.monthsPaid = updateData.monthsPaid || 0;
-      }
-      if (updateData.stayStartDate !== undefined) {
-        tenant.stayStartDate = updateData.stayStartDate
-          ? new Date(updateData.stayStartDate)
-          : null;
-      }
-      if (updateData.stayEndDate !== undefined) {
-        tenant.stayEndDate = updateData.stayEndDate
-          ? new Date(updateData.stayEndDate)
-          : null;
-      }
-
-      // Recalculate total amount if months paid or property changes
-      if (
-        updateData.monthsPaid !== undefined ||
-        updateData.propertyId !== undefined
-      ) {
-        const propertyRepository = AppDataSource.getRepository(Property);
-        const currentProperty = await propertyRepository.findOne({
-          where: { id: tenant.propertyId },
-        });
-
-        if (currentProperty) {
-          const monthlyRent = currentProperty.monthlyRent || 0;
-          const months = tenant.monthsPaid || 0;
-          tenant.totalAmount = monthlyRent * months;
-
-          // Recalculate stay end date if start date and months are available
-          if (tenant.stayStartDate && months > 0) {
-            const startDate = new Date(tenant.stayStartDate);
-            startDate.setMonth(startDate.getMonth() + months);
-            tenant.stayEndDate = startDate;
-          }
-        }
-      }
-
-      // Handle ID Number field
-      if (updateData.idNumber !== undefined) {
-        tenant.idNumber = updateData.idNumber || null;
-      }
-
-      // Handle other fields
-      const {
-        payment,
-        paymentDate,
-        paymentMethod,
-        monthsPaid,
-        stayStartDate,
-        stayEndDate,
-        idNumber,
-        ...otherFields
-      } = updateData;
-      Object.assign(tenant, otherFields);
-
+      Object.assign(tenant, {
+        ...updateData,
+        payment:
+          updateData.payment !== undefined
+            ? updateData.payment
+              ? Number(updateData.payment)
+              : null
+            : tenant.payment,
+        paymentDate:
+          updateData.paymentDate !== undefined
+            ? updateData.paymentDate
+              ? new Date(updateData.paymentDate)
+              : null
+            : tenant.paymentDate,
+        paymentMethod:
+          updateData.paymentMethod !== undefined
+            ? updateData.paymentMethod || null
+            : tenant.paymentMethod,
+        monthsPaid:
+          updateData.monthsPaid !== undefined
+            ? Number(updateData.monthsPaid || 0)
+            : tenant.monthsPaid,
+        stayStartDate:
+          updateData.stayStartDate !== undefined
+            ? updateData.stayStartDate
+              ? new Date(updateData.stayStartDate)
+              : null
+            : tenant.stayStartDate,
+        stayEndDate:
+          updateData.stayEndDate !== undefined
+            ? updateData.stayEndDate
+              ? new Date(updateData.stayEndDate)
+              : null
+            : tenant.stayEndDate,
+        totalAmount:
+          updateData.totalAmount !== undefined
+            ? Number(updateData.totalAmount || 0)
+            : tenant.totalAmount,
+      });
       const updatedTenant = await this.tenantRepository.save(tenant);
 
       res.json({
@@ -368,7 +313,7 @@ export class TenantController {
 
   async deleteTenant(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
 
       const tenant = await this.tenantRepository.findOne({
@@ -392,6 +337,93 @@ export class TenantController {
       } as ApiResponse);
     } catch (error) {
       console.error("Delete tenant error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      } as ApiResponse);
+    }
+  }
+
+  async recordPayment(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const ownerId = req.user!.id;
+      const {
+        amount,
+        monthsPaid = 1,
+        paymentDate,
+        paymentMethod,
+        stayStartDate,
+      } = req.body as RecordPaymentBody;
+
+      const months = Number(monthsPaid);
+
+      if (!Number.isFinite(months) || months <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Months paid must be greater than zero",
+        } as ApiResponse);
+        return;
+      }
+
+      if (!paymentMethod) {
+        res.status(400).json({
+          success: false,
+          message: "Payment method is required",
+        } as ApiResponse);
+        return;
+      }
+
+      const tenant = await this.tenantRepository.findOne({
+        where: { id },
+        relations: ["property"],
+      });
+
+      if (!tenant || tenant.property.ownerId !== ownerId) {
+        res.status(404).json({
+          success: false,
+          message: "Tenant not found",
+        } as ApiResponse);
+        return;
+      }
+
+      const monthlyRent = Number(tenant.property.monthlyRent || 0);
+      const paymentAmount =
+        amount !== undefined && amount !== "" ? Number(amount) : monthlyRent * months;
+
+      if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Payment amount must be greater than zero",
+        } as ApiResponse);
+        return;
+      }
+
+      const paidAt = paymentDate ? new Date(paymentDate) : new Date();
+      const effectiveStayStartDate = tenant.stayStartDate
+        ? new Date(tenant.stayStartDate)
+        : stayStartDate
+        ? new Date(stayStartDate)
+        : paidAt;
+      const totalMonthsPaid = Number(tenant.monthsPaid || 0) + months;
+
+      tenant.payment = paymentAmount;
+      tenant.paymentDate = paidAt;
+      tenant.paymentMethod = paymentMethod;
+      tenant.monthsPaid = totalMonthsPaid;
+      tenant.stayStartDate = effectiveStayStartDate;
+      tenant.stayEndDate = this.addMonths(effectiveStayStartDate, totalMonthsPaid);
+      tenant.totalAmount = Number(tenant.totalAmount || 0) + paymentAmount;
+
+      const updatedTenant = await this.tenantRepository.save(tenant);
+
+      res.json({
+        success: true,
+        message: "Payment recorded successfully",
+        data: updatedTenant,
+      } as ApiResponse<Tenant>);
+    } catch (error) {
+      console.error("Record payment error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

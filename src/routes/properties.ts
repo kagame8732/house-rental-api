@@ -15,11 +15,11 @@ router.get(
   "/available",
   propertyController.getAvailableProperties.bind(propertyController)
 );
-router.get("/:id", propertyController.getPropertyById.bind(propertyController));
 router.get(
   "/:id/availability",
   propertyController.checkPropertyAvailability.bind(propertyController)
 );
+router.get("/:id", propertyController.getPropertyById.bind(propertyController));
 router.put("/:id", propertyController.updateProperty.bind(propertyController));
 router.delete(
   "/:id",

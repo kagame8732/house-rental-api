@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { config } from "dotenv";
 import path from "path";
-import { User, Property, Tenant, Maintenance } from "./models";
+import { User, Property, Tenant, Lease, Maintenance } from "./models";
 
 config();
 
@@ -14,8 +14,8 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "house_rental",
   synchronize: process.env.NODE_ENV === "development",
   logging: process.env.NODE_ENV === "development",
-  entities: [User, Property, Tenant, Maintenance],
-  migrations: [path.join(__dirname, "migrations/*.{ts,js}")],
+  entities: [User, Property, Tenant, Lease, Maintenance],
+  migrations: [path.join(__dirname, "migrations/*.{js,ts}")],
 });
 
 export const initializeDatabase = async (): Promise<void> => {

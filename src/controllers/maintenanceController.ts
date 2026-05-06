@@ -4,7 +4,6 @@ import {
   Maintenance,
   MaintenanceStatus,
   MaintenancePriority,
-  Property,
 } from "../database/models";
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
 
@@ -25,7 +24,7 @@ export class MaintenanceController {
       const ownerId = req.user!.id;
 
       // Verify property belongs to owner
-      const propertyRepository = AppDataSource.getRepository(Property);
+      const propertyRepository = AppDataSource.getRepository("Property");
       const property = await propertyRepository.findOne({
         where: { id: propertyId, ownerId },
       });
@@ -81,35 +80,10 @@ export class MaintenanceController {
       } = req.query as PaginationQuery & FilterQuery;
       const ownerId = req.user!.id;
 
-      // First get all property IDs owned by this user
-      const propertyRepository = AppDataSource.getRepository(Property);
-      const properties = await propertyRepository.find({
-        where: { ownerId },
-        select: ["id"],
-      });
-
-      const propertyIds = properties.map((p) => p.id);
-
-      if (propertyIds.length === 0) {
-        // No properties owned by this user, return empty result
-        res.json({
-          success: true,
-          message: "Maintenance requests retrieved successfully",
-          data: [],
-          pagination: {
-            page: Number(page),
-            limit: Number(limit),
-            total: 0,
-            totalPages: 0,
-          },
-        } as ApiResponse);
-        return;
-      }
-
       const queryBuilder = this.maintenanceRepository
         .createQueryBuilder("maintenance")
         .leftJoinAndSelect("maintenance.property", "property")
-        .where("maintenance.propertyId IN (:...propertyIds)", { propertyIds });
+        .where("property.ownerId = :ownerId", { ownerId });
 
       if (search) {
         queryBuilder.andWhere(
@@ -161,7 +135,7 @@ export class MaintenanceController {
 
   async getMaintenanceById(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
 
       const maintenance = await this.maintenanceRepository.findOne({
@@ -199,7 +173,7 @@ export class MaintenanceController {
 
   async updateMaintenance(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
       const updateData = req.body;
 
@@ -245,7 +219,7 @@ export class MaintenanceController {
 
   async deleteMaintenance(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
 
       const maintenance = await this.maintenanceRepository.findOne({
