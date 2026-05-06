@@ -10,11 +10,18 @@ import {
   Unique,
 } from "typeorm";
 import { Property } from "./Property";
+import { Lease } from "./Lease";
 
 export enum TenantStatus {
   ACTIVE = "active",
   INACTIVE = "inactive",
   EVICTED = "evicted",
+}
+
+export enum TenantPaymentStatus {
+  PENDING = "pending",
+  PAID = "paid",
+  LATE = "late",
 }
 
 @Entity("tenants")
@@ -29,14 +36,14 @@ export class Tenant {
   // @Unique(["phone"])
   phone: string;
 
-  @Column({ type: "varchar", length: 50 })
-  idNumber: string;
+  @Column({ type: "varchar", length: 50, nullable: true })
+  idNumber: string | null;
 
   @Column({ type: "varchar", length: 100, nullable: true })
-  email: string | null;
+  email: string;
 
   @Column({ type: "text", nullable: true })
-  address: string | null;
+  address: string;
 
   @Column({
     type: "enum",
@@ -44,6 +51,9 @@ export class Tenant {
     default: TenantStatus.ACTIVE,
   })
   status: TenantStatus;
+
+  @Column({ type: "uuid" })
+  propertyId: string;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   payment: number | null;
@@ -58,6 +68,13 @@ export class Tenant {
   })
   paymentMethod: "cash" | "bank" | "mobile_money" | null;
 
+  @Column({
+    type: "enum",
+    enum: TenantPaymentStatus,
+    default: TenantPaymentStatus.PENDING,
+  })
+  paymentStatus: TenantPaymentStatus;
+
   @Column({ type: "integer", default: 0 })
   monthsPaid: number;
 
@@ -70,12 +87,12 @@ export class Tenant {
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   totalAmount: number | null;
 
-  @Column({ type: "uuid" })
-  propertyId: string;
-
   @ManyToOne(() => Property, (property) => property.tenants)
   @JoinColumn({ name: "propertyId" })
   property: Property;
+
+  @OneToMany(() => Lease, (lease) => lease.tenant)
+  leases: Lease[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -21,7 +21,10 @@ export class PropertyController {
         address,
         type,
         status: status || PropertyStatus.ACTIVE,
-        monthlyRent,
+        monthlyRent:
+          monthlyRent !== undefined && monthlyRent !== ""
+            ? Number(monthlyRent)
+            : null,
         ownerId,
       });
 
@@ -102,12 +105,12 @@ export class PropertyController {
 
   async getPropertyById(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
 
       const property = await this.propertyRepository.findOne({
         where: { id, ownerId },
-        relations: ["tenants", "owner"],
+        relations: ["tenants", "leases", "owner"],
       });
 
       if (!property) {
@@ -132,9 +135,80 @@ export class PropertyController {
     }
   }
 
+  async getAvailableProperties(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+
+      const properties = await this.propertyRepository.find({
+        where: { ownerId, status: PropertyStatus.ACTIVE },
+        relations: ["tenants"],
+        order: { name: "ASC" },
+      });
+
+      const availableProperties = properties.filter(
+        (property) =>
+          !property.tenants?.some(
+            (tenant) => tenant.status === TenantStatus.ACTIVE
+          )
+      );
+
+      res.json({
+        success: true,
+        message: "Available properties retrieved successfully",
+        data: availableProperties,
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Get available properties error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      } as ApiResponse);
+    }
+  }
+
+  async checkPropertyAvailability(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const ownerId = req.user!.id;
+
+      const property = await this.propertyRepository.findOne({
+        where: { id, ownerId },
+        relations: ["tenants"],
+      });
+
+      if (!property) {
+        res.status(404).json({
+          success: false,
+          message: "Property not found",
+        } as ApiResponse);
+        return;
+      }
+
+      const activeTenant = property.tenants?.find(
+        (tenant) => tenant.status === TenantStatus.ACTIVE
+      );
+
+      res.json({
+        success: true,
+        message: "Property availability checked",
+        data: {
+          propertyId: id,
+          isAvailable: !activeTenant,
+          currentTenant: activeTenant || null,
+        },
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Check property availability error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      } as ApiResponse);
+    }
+  }
+
   async updateProperty(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
       const updateData = req.body;
 
@@ -169,7 +243,7 @@ export class PropertyController {
 
   async deleteProperty(req: Request, res: Response): Promise<void> {
     try {
-      const id = String(req.params.id);
+      const { id } = req.params;
       const ownerId = req.user!.id;
 
       const property = await this.propertyRepository.findOne({
@@ -192,81 +266,6 @@ export class PropertyController {
       } as ApiResponse);
     } catch (error) {
       console.error("Delete property error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal server error",
-      } as ApiResponse);
-    }
-  }
-
-  async checkPropertyAvailability(req: Request, res: Response): Promise<void> {
-    try {
-      const id = String(req.params.id);
-      const ownerId = req.user!.id;
-
-      const property = await this.propertyRepository.findOne({
-        where: { id, ownerId },
-        relations: ["tenants"],
-      });
-
-      if (!property) {
-        res.status(404).json({
-          success: false,
-          message: "Property not found",
-        } as ApiResponse);
-        return;
-      }
-
-      // Check if property has any active tenants
-      const activeTenant = property.tenants?.find(
-        (tenant) => tenant.status === TenantStatus.ACTIVE
-      );
-      const isAvailable = !activeTenant;
-
-      res.json({
-        success: true,
-        message: "Property availability checked",
-        data: {
-          propertyId: id,
-          isAvailable,
-          currentTenant: activeTenant || null,
-        },
-      } as ApiResponse);
-    } catch (error) {
-      console.error("Check property availability error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal server error",
-      } as ApiResponse);
-    }
-  }
-
-  async getAvailableProperties(req: Request, res: Response): Promise<void> {
-    try {
-      const ownerId = req.user!.id;
-
-      // Get all properties owned by the user with their tenants
-      const properties = await this.propertyRepository.find({
-        where: { ownerId, status: PropertyStatus.ACTIVE },
-        relations: ["tenants"],
-        order: { name: "ASC" },
-      });
-
-      // Filter out properties that have active tenants
-      const availableProperties = properties.filter(
-        (property) =>
-          !property.tenants?.some(
-            (tenant) => tenant.status === TenantStatus.ACTIVE
-          )
-      );
-
-      res.json({
-        success: true,
-        message: "Available properties retrieved successfully",
-        data: availableProperties,
-      } as ApiResponse);
-    } catch (error) {
-      console.error("Get available properties error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

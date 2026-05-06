@@ -173,7 +173,6 @@ export class ReportController {
       const pendingMaintenance = maintenance.filter(
         (item) => item.status === MaintenanceStatus.PENDING
       ).length;
-
       const expectedMonthlyRent = tenants
         .filter((tenant) => tenant.status === TenantStatus.ACTIVE)
         .reduce((total, tenant) => {
