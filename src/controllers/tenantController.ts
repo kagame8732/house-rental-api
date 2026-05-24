@@ -4,6 +4,7 @@ import { Property, Tenant, TenantPaymentStatus, TenantStatus } from "../database
 import { ApiResponse, PaginationQuery, FilterQuery } from "../types";
 
 type PaymentMethod = "cash" | "bank" | "mobile_money";
+type PaymentType = "full" | "partial";
 
 interface RecordPaymentBody {
   amount?: number | string;
@@ -11,6 +12,7 @@ interface RecordPaymentBody {
   paymentDate?: string;
   paymentMethod?: PaymentMethod;
   paymentStatus?: TenantPaymentStatus;
+  paymentType?: PaymentType;
   stayStartDate?: string;
 }
 
@@ -21,6 +23,41 @@ export class TenantController {
     const nextDate = new Date(date);
     nextDate.setMonth(nextDate.getMonth() + months);
     return nextDate;
+  }
+
+  private getPaymentProgress(tenant: Tenant): {
+    currentMonthPaid: number;
+    currentMonthBalance: number;
+  } {
+    const monthlyRent = Number(tenant.property?.monthlyRent || 0);
+    const totalAmount = Number(tenant.totalAmount || 0);
+    const monthsPaid = Number(tenant.monthsPaid || 0);
+
+    if (monthlyRent <= 0) {
+      return {
+        currentMonthPaid: 0,
+        currentMonthBalance: 0,
+      };
+    }
+
+    const coveredAmount = monthsPaid * monthlyRent;
+    const currentMonthPaid = Math.min(
+      Math.max(totalAmount - coveredAmount, 0),
+      monthlyRent
+    );
+    const currentMonthBalance = Math.max(monthlyRent - currentMonthPaid, 0);
+
+    return {
+      currentMonthPaid,
+      currentMonthBalance,
+    };
+  }
+
+  private withPaymentProgress<T extends Tenant>(tenant: T): T & {
+    currentMonthPaid: number;
+    currentMonthBalance: number;
+  } {
+    return Object.assign(tenant, this.getPaymentProgress(tenant));
   }
 
   async createTenant(req: Request, res: Response): Promise<void> {
@@ -100,7 +137,7 @@ export class TenantController {
       res.status(201).json({
         success: true,
         message: "Tenant created successfully",
-        data: savedTenant,
+        data: this.withPaymentProgress(Object.assign(savedTenant, { property })),
       } as ApiResponse);
     } catch (error) {
       console.error("Create tenant error:", error);
@@ -156,7 +193,7 @@ export class TenantController {
       res.json({
         success: true,
         message: "Tenants retrieved successfully",
-        data: tenants,
+        data: tenants.map((tenant) => this.withPaymentProgress(tenant)),
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -200,7 +237,7 @@ export class TenantController {
       res.json({
         success: true,
         message: "Tenant retrieved successfully",
-        data: tenant,
+        data: this.withPaymentProgress(tenant),
       } as ApiResponse);
     } catch (error) {
       console.error("Get tenant error:", error);
@@ -302,7 +339,7 @@ export class TenantController {
       res.json({
         success: true,
         message: "Tenant updated successfully",
-        data: updatedTenant,
+        data: this.withPaymentProgress(updatedTenant),
       } as ApiResponse);
     } catch (error) {
       console.error("Update tenant error:", error);
@@ -352,16 +389,18 @@ export class TenantController {
       const ownerId = req.user!.id;
       const {
         amount,
-        monthsPaid = 1,
+        monthsPaid,
         paymentDate,
         paymentMethod,
         paymentStatus,
+        paymentType = "full",
         stayStartDate,
       } = req.body as RecordPaymentBody;
 
-      const months = Number(monthsPaid);
+      const isPartialPayment = paymentType === "partial";
+      const months = Number(monthsPaid ?? (isPartialPayment ? 0 : 1));
 
-      if (!Number.isFinite(months) || months <= 0) {
+      if (!Number.isFinite(months) || (!isPartialPayment && months <= 0)) {
         res.status(400).json({
           success: false,
           message: "Months paid must be greater than zero",
@@ -405,26 +444,46 @@ export class TenantController {
       const paidAt = paymentDate ? new Date(paymentDate) : new Date();
       const effectiveStayStartDate = tenant.stayStartDate
         ? new Date(tenant.stayStartDate)
-        : stayStartDate
+          : stayStartDate
         ? new Date(stayStartDate)
         : paidAt;
-      const totalMonthsPaid = Number(tenant.monthsPaid || 0) + months;
+      const existingMonthsPaid = Number(tenant.monthsPaid || 0);
+      const existingTotalAmount = Number(tenant.totalAmount || 0);
+      const nextTotalAmount = existingTotalAmount + paymentAmount;
+      const coveredAmount = existingMonthsPaid * monthlyRent;
+      const partialAmountPaid =
+        monthlyRent > 0 ? Math.max(existingTotalAmount - coveredAmount, 0) : 0;
+      const nextPartialAmountPaid = partialAmountPaid + paymentAmount;
+      const monthsCoveredByPartial =
+        isPartialPayment && monthlyRent > 0
+          ? Math.floor(nextPartialAmountPaid / monthlyRent)
+          : 0;
+      const totalMonthsPaid =
+        existingMonthsPaid + (isPartialPayment ? monthsCoveredByPartial : months);
+      const currentMonthPaid =
+        monthlyRent > 0 ? Math.max(nextTotalAmount - totalMonthsPaid * monthlyRent, 0) : 0;
 
       tenant.payment = paymentAmount;
       tenant.paymentDate = paidAt;
       tenant.paymentMethod = paymentMethod;
-      tenant.paymentStatus = paymentStatus || TenantPaymentStatus.PAID;
+      tenant.paymentStatus =
+        paymentStatus ||
+        (isPartialPayment && currentMonthPaid > 0
+          ? TenantPaymentStatus.PENDING
+          : TenantPaymentStatus.PAID);
       tenant.monthsPaid = totalMonthsPaid;
-      tenant.stayStartDate = effectiveStayStartDate;
-      tenant.stayEndDate = this.addMonths(effectiveStayStartDate, totalMonthsPaid);
-      tenant.totalAmount = Number(tenant.totalAmount || 0) + paymentAmount;
+      tenant.stayStartDate = tenant.stayStartDate || effectiveStayStartDate;
+      tenant.stayEndDate = isPartialPayment && monthsCoveredByPartial === 0
+        ? tenant.stayEndDate
+        : this.addMonths(effectiveStayStartDate, totalMonthsPaid);
+      tenant.totalAmount = nextTotalAmount;
 
       const updatedTenant = await this.tenantRepository.save(tenant);
 
       res.json({
         success: true,
         message: "Payment recorded successfully",
-        data: updatedTenant,
+        data: this.withPaymentProgress(updatedTenant),
       } as ApiResponse<Tenant>);
     } catch (error) {
       console.error("Record payment error:", error);
